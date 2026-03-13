@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import * as pdfjsLib from 'pdfjs-dist';
+import type * as pdfjsLib from 'pdfjs-dist';
 import { CheckCircle } from 'lucide-react';
 
 interface PdfThumbnailProps {
@@ -65,6 +65,7 @@ export default function PdfThumbnail({ pdf, pageNumber, isSelected, onToggle }: 
 
                 const renderContext = {
                     canvasContext: context,
+                    canvas: canvas,
                     viewport: scaledViewport,
                 };
 

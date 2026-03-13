@@ -32,7 +32,8 @@ export async function generateFilteredPdf(
     const modifiedPdfBytes = await newDoc.save();
 
     // Trigger browser download
-    const blob = new Blob([modifiedPdfBytes], { type: 'application/pdf' });
+    const pdfBuffer = new Uint8Array(modifiedPdfBytes).buffer as ArrayBuffer;
+    const blob = new Blob([pdfBuffer], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
 
     const anchor = document.createElement('a');

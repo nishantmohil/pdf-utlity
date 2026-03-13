@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# scanned documents (user data)
+/scanned-documents/*
+!/scanned-documents/.gitkeep
+
+# gemini
+.gemini/

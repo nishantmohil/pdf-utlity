@@ -1,18 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import * as pdfjsLib from 'pdfjs-dist';
+import { useState, useEffect, useRef } from 'react';
+import type * as PdfjsLibType from 'pdfjs-dist';
 import PdfUploader from './components/PdfUploader';
 import PdfGrid from './components/PdfGrid';
 import { generateFilteredPdf } from './utils/pdfUtils';
 import { Loader2, Download, ArrowLeft, BookOpen, Hash, FileCheck, Search } from 'lucide-react';
 
-// Setup pdfjs worker directly using unpkg (reliable for client-side rendering)
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+// pdfjs-dist is loaded dynamically to avoid SSR issues (DOMMatrix not defined)
+type PdfjsLib = typeof PdfjsLibType;
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
-  const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
+  const [pdfDoc, setPdfDoc] = useState<PdfjsLibType.PDFDocumentProxy | null>(null);
   const [numPages, setNumPages] = useState<number>(0);
   const [selectedPages, setSelectedPages] = useState<Set<number>>(new Set());
 
@@ -21,8 +21,62 @@ export default function Home() {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [extractedTopics, setExtractedTopics] = useState<string[]>([]);
+  const [contentPageNum, setContentPageNum] = useState<number>(1);
+  const [isExtracting, setIsExtracting] = useState<boolean>(false);
+
+  // Dynamically loaded pdfjs-dist module (client-side only)
+  const pdfjsRef = useRef<PdfjsLib | null>(null);
+
+  useEffect(() => {
+    import('pdfjs-dist').then((pdfjs) => {
+      pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+      pdfjsRef.current = pdfjs;
+    });
+  }, []);
+
+  const extractTopicsFromPage = async (pdfDocProxy: PdfjsLibType.PDFDocumentProxy, pageNumber: number) => {
+    if (!pdfDocProxy || pageNumber < 1 || pageNumber > pdfDocProxy.numPages) return;
+    setIsExtracting(true);
+    try {
+      const page = await pdfDocProxy.getPage(pageNumber);
+      const textContent = await page.getTextContent();
+      const topics = new Set<string>();
+      let currentLine = '';
+      let lastY = -1;
+
+      textContent.items.forEach((item: any) => {
+        if (lastY !== item.transform[5] && currentLine) {
+          const text = currentLine.trim();
+          if (text.length > 3 && !/^\d+$/.test(text) && !/^_+$/.test(text)) {
+            topics.add(text);
+          }
+          currentLine = '';
+        }
+        currentLine += item.str;
+        lastY = item.transform[5];
+      });
+
+      const lastText = currentLine.trim();
+      if (lastText.length > 3 && !/^\d+$/.test(lastText) && !/^_+$/.test(lastText)) {
+        topics.add(lastText);
+      }
+
+      setExtractedTopics(Array.from(topics));
+    } catch (err) {
+      console.error("Text extraction failed", err);
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
 
   const handleFileUpload = async (uploadedFile: File) => {
+    const pdfjsLib = pdfjsRef.current;
+    if (!pdfjsLib) {
+      alert('PDF library is still loading. Please try again in a moment.');
+      return;
+    }
     setIsProcessing(true);
     setFile(uploadedFile);
     try {
@@ -32,6 +86,9 @@ export default function Home() {
       setPdfDoc(pdf);
       setNumPages(pdf.numPages);
       setSelectedPages(new Set());
+
+      setContentPageNum(1);
+      extractTopicsFromPage(pdf, 1);
     } catch (error) {
       console.error("Error loading PDF:", error);
       alert("Failed to read the PDF file. Please try another one.");
@@ -154,17 +211,46 @@ export default function Home() {
             <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Output Settings</h3>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700 flex items-center space-x-2">
-                <Search className="w-4 h-4 text-slate-400" />
-                <span>Topic Name</span>
-              </label>
-              <input
-                type="text"
-                value={topicName}
-                onChange={(e) => setTopicName(e.target.value)}
-                placeholder="e.g. Algebra_Equations"
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-indigo-500 justify-center focus:ring-2 focus:ring-indigo-200 outline-none transition-all placeholder:text-slate-300"
-              />
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-slate-700 flex items-center space-x-2">
+                  <Search className="w-4 h-4 text-slate-400" />
+                  <span>Topic Name</span>
+                </label>
+                <div className="flex items-center space-x-2 bg-slate-50 border border-slate-200 px-2 py-1 rounded-md">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Read Page:</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={numPages || 1}
+                    value={contentPageNum}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      if (val > 0 && val <= numPages) {
+                        setContentPageNum(val);
+                        if (pdfDoc) extractTopicsFromPage(pdfDoc, val);
+                      }
+                    }}
+                    className="w-10 px-1 py-0.5 text-xs rounded bg-white border border-slate-300 text-center font-medium focus:outline-none focus:border-indigo-400"
+                  />
+                  {isExtracting && <Loader2 className="w-3 h-3 text-indigo-500 animate-spin" />}
+                </div>
+              </div>
+
+              <div className="relative">
+                <input
+                  type="text"
+                  list="extracted-topics"
+                  value={topicName}
+                  onChange={(e) => setTopicName(e.target.value)}
+                  placeholder={isExtracting ? "Extracting..." : "e.g. Algebra_Equations"}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-indigo-500 justify-center focus:ring-2 focus:ring-indigo-200 outline-none transition-all placeholder:text-slate-300"
+                />
+                <datalist id="extracted-topics">
+                  {extractedTopics.map((topic, i) => (
+                    <option key={i} value={topic} />
+                  ))}
+                </datalist>
+              </div>
             </div>
 
             <div className="space-y-2">

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import * as pdfjsLib from 'pdfjs-dist';
+import type * as pdfjsLib from 'pdfjs-dist';
 import PdfThumbnail from './PdfThumbnail';
 
 interface PdfGridProps {
