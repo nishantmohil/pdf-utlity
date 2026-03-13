@@ -166,6 +166,22 @@ export default function Home() {
         ) : (
           <PdfUploader onFileUpload={handleFileUpload} />
         )}
+
+        <div className="flex items-center justify-center space-x-4 mt-6">
+          <a
+            href="/scanner"
+            className="text-indigo-500 hover:text-indigo-700 text-sm font-medium transition-colors"
+          >
+            📷 Document Scanner
+          </a>
+          <span className="text-slate-300">|</span>
+          <a
+            href="/scanner/view"
+            className="text-indigo-500 hover:text-indigo-700 text-sm font-medium transition-colors"
+          >
+            📂 View Documents
+          </a>
+        </div>
       </div>
     );
   }

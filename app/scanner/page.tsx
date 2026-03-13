@@ -225,14 +225,21 @@ export default function ScannerPage() {
             </button>
           </form>
 
-          {/* Link to main tool */}
-          <div className="text-center">
+          {/* Navigation links */}
+          <div className="flex items-center justify-center space-x-4">
             <a
               href="/"
               className="text-emerald-400/60 hover:text-emerald-400 text-sm transition-colors inline-flex items-center space-x-1"
             >
               <ArrowLeft className="w-3 h-3" />
-              <span>Back to Worksheet Generator</span>
+              <span>Worksheet Generator</span>
+            </a>
+            <span className="text-emerald-400/20">|</span>
+            <a
+              href="/scanner/view"
+              className="text-emerald-400/60 hover:text-emerald-400 text-sm transition-colors"
+            >
+              📂 View Documents
             </a>
           </div>
         </div>
